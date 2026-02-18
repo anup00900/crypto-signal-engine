@@ -34,6 +34,7 @@ logs/
 
 # Documentation artifacts
 *.docx
+!Crypto_Signal_Engine_Documentation.docx
 
 # IDE
 .vscode/
