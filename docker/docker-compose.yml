@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: crypto-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-changeme}
+      POSTGRES_DB: crypto_data
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crypto_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crypto-network
+
+  # pgAdmin Web Interface (for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: crypto-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@crypto.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-changeme}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - crypto-network
+
+volumes:
+  postgres_data:
+    name: crypto-postgres-data
+  pgadmin_data:
+    name: crypto-pgadmin-data
+
+networks:
+  crypto-network:
+    name: crypto-network
+    driver: bridge
+
+

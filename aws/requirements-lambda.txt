@@ -1,0 +1,24 @@
+# Lambda Dependencies
+# These are the minimal dependencies needed for Lambda execution
+
+# AWS SDK (already in Lambda runtime, but include for local testing)
+boto3>=1.28.0
+
+# HTTP/WebSocket clients
+aiohttp>=3.9.0
+websockets>=12.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Configuration
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Logging
+loguru>=0.7.0
+
+# Note: psycopg2 is NOT included as we're using S3, not RDS
+# If you want RDS support, add: psycopg2-binary>=2.9.0
+

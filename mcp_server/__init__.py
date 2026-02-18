@@ -1,0 +1,1 @@
+"""Crypto Signals MCP Server"""

@@ -1,0 +1,59 @@
+# Environment & secrets
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# AWS Lambda package (build artifacts)
+aws/package/
+aws/terraform/tfplan
+aws/terraform/terraform.tfstate
+aws/terraform/terraform.tfstate.backup
+aws/terraform/response.json
+aws/terraform/.terraform/
+aws/terraform/.terraform.lock.hcl
+
+# Data files (too large for git)
+data/
+data_exports/
+logs/
+*.log
+*.csv
+*.parquet
+
+# Documentation artifacts
+*.docx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database dumps
+supabase_export/
+*.sql.gz
+
+# Supabase temp
+supabase/.temp/
+supabase/.branches/
+
+# Claude Code local config
+.claude/
+.mcp.json

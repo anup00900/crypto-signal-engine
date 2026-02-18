@@ -1,0 +1,15 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Deribit Data",
+            "Group": "Servers",
+            "Host": "deribit-postgres",
+            "Port": 5432,
+            "MaintenanceDB": "deribit_data",
+            "Username": "admin",
+            "SSLMode": "prefer",
+            "PassFile": "/pgpass"
+        }
+    }
+}
+
