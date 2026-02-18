@@ -20,9 +20,12 @@ Binance Futures API
         |
    [S3 Bucket: eu-north-1]
         |
-   [MCP Server (stdio)]
-        |
-   Claude Code / Claude Desktop / Cursor / Any MCP Client
+   ┌────┴────┐
+   |         |
+[MCP Server] [Web Dashboard]
+  (stdio)    (localhost:8080)
+   |
+Claude Code / Claude Desktop / Cursor / Any MCP Client
 ```
 
 ## Signal Engine
@@ -216,6 +219,34 @@ If you get signal data back, you're connected.
 
 ---
 
+## Web Dashboard
+
+A browser-based trading terminal UI that visualizes all signal engine data in real time.
+
+```bash
+pip install flask boto3 pandas pyarrow
+python3 web/dashboard.py
+# → http://localhost:8080
+```
+
+| Panel | What It Shows |
+|-------|---------------|
+| **Signal Cards** | TDS gauge, 7 component scores, entry status, direction |
+| **Score Radar** | Radar chart of all 7 signals |
+| **Derivatives** | Mark/index price, funding rate, open interest, basis |
+| **TP / Invalidation** | Take-profit levels (TP1-3) + stop loss level |
+| **Volume Profile** | Horizontal bar chart — POC, HVN, LVN, VAH, VAL |
+| **Positioning** | Taker buy vs sell stacked bar chart |
+| **Candles** | Last 20 1-minute candles with delta coloring |
+| **Trade Journal** | Logged trades with PnL tracking |
+
+- Dark trading-terminal theme, monospace font
+- Auto-refreshes every 60 seconds
+- Tabs to switch between BTC/USDT, ETH/USDT, or ALL
+- Requires AWS credentials with S3 read access (same as MCP server)
+
+---
+
 ## MCP Tools Reference (53 Tools)
 
 | Category | Tools | Description |
@@ -340,6 +371,8 @@ crypto-signal-engine/
 │   ├── s3_storage.py          # S3 read/write utilities
 │   ├── lambda_handler.py      # Deribit Lambda entry point
 │   └── deploy.sh              # Build + deploy script
+├── web/
+│   └── dashboard.py           # Web dashboard (Flask, single-file)
 ├── mcp_server/
 │   └── signal_server.py       # MCP stdio server (53 tools)
 ├── collectors/                # Exchange API clients
