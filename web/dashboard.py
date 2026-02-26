@@ -146,6 +146,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Crypto Signal Engine</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -223,6 +224,11 @@ a{color:var(--blue);text-decoration:none}
 
 /* Loading skeleton */
 .loading{color:var(--dim);font-size:12px;padding:20px;text-align:center}
+
+/* Architecture diagram */
+.arch-container{padding:20px;display:flex;flex-direction:column;align-items:center}
+.arch-container .mermaid{width:100%;max-width:1400px;overflow-x:auto}
+.arch-container .mermaid svg{width:100%;height:auto;min-height:600px}
 </style>
 </head>
 <body>
@@ -247,6 +253,132 @@ a{color:var(--blue);text-decoration:none}
 </div>
 
 <script>
+// ── Mermaid init ──
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    darkMode: true,
+    background: '#161b22',
+    primaryColor: '#1f6feb',
+    primaryTextColor: '#c9d1d9',
+    primaryBorderColor: '#30363d',
+    lineColor: '#58a6ff',
+    secondaryColor: '#238636',
+    tertiaryColor: '#1c2333',
+    fontFamily: 'JetBrains Mono, SF Mono, Fira Code, monospace',
+    fontSize: '13px',
+    nodeTextColor: '#c9d1d9',
+  }
+});
+
+const ARCH_DIAGRAM = `flowchart TB
+subgraph External["External APIs"]
+DERIBIT["Deribit API - WebSocket"]
+BINANCE["Binance Futures API - REST"]
+end
+
+subgraph AWS["AWS Cloud eu-north-1"]
+subgraph Triggers["EventBridge Schedules"]
+EB15["Every 15 min"]
+EB1["Every 1 min"]
+end
+
+subgraph DeribitLambda["Deribit Collector Lambda 1024MB"]
+DH["lambda_handler.py"]
+DC["collector.py CryptoCollector"]
+DCLIENT["DeribitClient WebSocket"]
+DH --> DC --> DCLIENT
+end
+
+subgraph SignalLambda["Signal Engine Lambda 256MB"]
+SH["handler.py 8-step pipeline"]
+BF["binance_fetcher.py stdlib"]
+CS["candle_store.py S3 buffer"]
+SE["signal_engine.py 7 signals"]
+CFG["config.py weights"]
+SH -->|Step 2 Fetch| BF
+SH -->|Step 3 Load| CS
+SH -->|Step 7 Compute| SE
+SE -.->|weights| CFG
+end
+
+SECRETS["Secrets Manager"]
+SNS["SNS Alerts"]
+CW["CloudWatch Logs + Alarms"]
+
+subgraph S3["S3 Bucket"]
+subgraph DeribitData["data - Deribit"]
+OG["options_greeks parquet"]
+OB["orderbook parquet"]
+OI_D["open_interest parquet"]
+CSV["OHLCV funding csv"]
+end
+
+subgraph SignalData["signals - Signal Engine"]
+subgraph Rolling["Rolling Buffers"]
+CANDLES["candles_1m_rolling 1500 rows"]
+DERIVS["derivatives_rolling"]
+LIQS["liquidations_rolling"]
+end
+subgraph JSONf["JSON Files"]
+VP["volume_profile.json"]
+SIG["signals_latest.json"]
+TRADES["trades_executed.json"]
+end
+subgraph Archive["Daily Archives"]
+ASIG["archive signals_1m"]
+ACAN["archive candles_1m"]
+ADER["archive derivatives_1m"]
+end
+end
+end
+end
+
+subgraph Local["Local Machine"]
+subgraph MCP["MCP Server Python 3.13"]
+MCPT["53 Tools - Signals Candles Derivatives Profiles History Diagnostics Trades"]
+end
+
+subgraph Dashboard["Web Dashboard Flask 8080"]
+FLASK["Flask API Routes"]
+UI["Chart.js UI"]
+FLASK --> UI
+end
+
+CC["Claude Code CLI"]
+BROWSER["Browser"]
+DEPLOY["deploy.sh"]
+end
+
+EB15 ==>|invoke| DH
+EB1 ==>|invoke| SH
+
+DCLIENT -->|WS| DERIBIT
+DH -->|read creds| SECRETS
+DC -->|write| DeribitData
+DH -->|logs| CW
+
+BF -->|6 calls per symbol| BINANCE
+CS -->|read write| Rolling
+CS -->|write| JSONf
+CS -->|append| Archive
+SH -->|logs| CW
+
+SE -->|TDS computation| SIG
+
+MCPT -->|boto3 reads| SignalData
+MCPT -->|boto3 reads| DeribitData
+MCPT -->|write trades| TRADES
+FLASK -->|boto3 reads| SignalData
+
+CC -->|stdio| MCPT
+MCPT -->|stdio| CC
+BROWSER -->|HTTP| FLASK
+
+CW -.->|alarm| SNS
+`;
+
 // ── State ──
 let CURRENT_SYMBOL = 'BTCUSDT';
 let SIGNALS = {};
@@ -314,17 +446,44 @@ function renderTabs(symbols) {
   const el = $('#symbolTabs');
   el.innerHTML = symbols.map(s =>
     `<div class="tab${s===CURRENT_SYMBOL?' active':''}" onclick="switchSymbol('${s}')">${s.replace('USDT','')}/USDT</div>`
-  ).join('') + '<div class="tab" onclick="switchSymbol(\'ALL\')">ALL</div>';
+  ).join('')
+  + '<div class="tab'+(CURRENT_SYMBOL==='ALL'?' active':'')+'" onclick="switchSymbol(\'ALL\')">ALL</div>'
+  + '<div class="tab'+(CURRENT_SYMBOL==='ARCH'?' active':'')+'" onclick="switchSymbol(\'ARCH\')" style="margin-left:auto;color:var(--purple)">ARCHITECTURE</div>';
 }
 const KNOWN_SYMBOLS = ['BTCUSDT','ETHUSDT'];
 
 function switchSymbol(s) {
   CURRENT_SYMBOL = s;
+  if (s === 'ARCH') {
+    renderArchitecture();
+    return;
+  }
   const hasSignals = Object.keys(SIGNALS).length > 0;
   if (hasSignals) {
     renderAll();
   } else {
     renderWaiting();
+  }
+}
+
+async function renderArchitecture() {
+  const syms = Object.keys(SIGNALS).length > 0 ? Object.keys(SIGNALS) : KNOWN_SYMBOLS;
+  renderTabs(syms);
+  const grid = $('#dashboard');
+  grid.innerHTML = `
+    <div class="full arch-container">
+      <div class="card full" style="width:100%;max-width:1400px">
+        <div class="card-head">System Architecture <span class="c-dim">Mermaid</span></div>
+        <div class="card-body" style="padding:20px;overflow-x:auto">
+          <div class="mermaid" id="archDiagram"></div>
+        </div>
+      </div>
+    </div>`;
+  try {
+    const { svg } = await mermaid.render('archSvg', ARCH_DIAGRAM);
+    document.getElementById('archDiagram').innerHTML = svg;
+  } catch(e) {
+    document.getElementById('archDiagram').innerHTML = '<span class="c-red">Diagram render error: '+e.message+'</span>';
   }
 }
 

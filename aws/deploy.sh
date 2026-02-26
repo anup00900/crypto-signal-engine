@@ -90,9 +90,9 @@ echo "Building in: $BUILD_DIR"
 # Install dependencies (pandas/numpy from Lambda Layer, no pydantic needed)
 echo "Installing lightweight dependencies..."
 pip3 install --target "$BUILD_DIR" --upgrade \
-    aiohttp websockets loguru boto3 2>/dev/null || \
+    aiohttp websockets loguru boto3 flask mangum asgiref 2>/dev/null || \
 pip3 install --target "$BUILD_DIR" --upgrade \
-    aiohttp websockets loguru boto3
+    aiohttp websockets loguru boto3 flask mangum asgiref
 
 # Copy ONLY the files we need (avoid importing pydantic via __init__.py)
 echo "Copying project code..."
@@ -103,6 +103,13 @@ cp "$SCRIPT_DIR"/*.py "$BUILD_DIR/aws/"
 
 # Signal Lambda module
 cp -r "$SCRIPT_DIR/signal_lambda" "$BUILD_DIR/aws/signal_lambda"
+
+# Dashboard Lambda module
+cp -r "$SCRIPT_DIR/dashboard_lambda" "$BUILD_DIR/aws/dashboard_lambda"
+
+# Web module (Flask dashboard app)
+cp -r "$PROJECT_ROOT/web" "$BUILD_DIR/web"
+touch "$BUILD_DIR/web/__init__.py"
 
 # Only copy the api_client we actually use (not the whole collectors tree)
 mkdir -p "$BUILD_DIR/collectors/deribit"
