@@ -22,8 +22,8 @@ Binance Futures API
         |
    ┌────┴────┐
    |         |
-[MCP Server] [Web Dashboard]
-  (stdio)    (localhost:8080)
+[MCP Server] [Dashboard Lambda]
+  (stdio)    (API Gateway → public URL)
    |
 Claude Code / Claude Desktop / Cursor / Any MCP Client
 ```
@@ -221,7 +221,11 @@ If you get signal data back, you're connected.
 
 ## Web Dashboard
 
-A browser-based trading terminal UI that visualizes all signal engine data in real time.
+**Live:** https://rr9svyuw2e.execute-api.eu-north-1.amazonaws.com/
+
+A browser-based trading terminal UI that visualizes all signal engine data in real time. Hosted on AWS Lambda + API Gateway — just open the link, no setup needed. Auto-refreshes every 60 seconds.
+
+To run locally instead:
 
 ```bash
 pip install flask boto3 pandas pyarrow
@@ -273,11 +277,13 @@ python3 web/dashboard.py
 
 | Resource | Details |
 |----------|---------|
-| **Signal Lambda** | `crypto-collector-prod-signal-engine`, 256MB, 30s timeout, Python 3.11 |
-| **Trigger** | EventBridge rule, every 1 minute |
+| **Signal Lambda** | `crypto-collector-prod-signal-engine`, 256MB, 30s timeout, every 1 min |
+| **Deribit Lambda** | `crypto-collector-prod`, 1024MB, 900s timeout, every 15 min |
+| **Dashboard Lambda** | `crypto-collector-prod-dashboard`, 256MB, 30s timeout, on-demand |
+| **API Gateway** | HTTP API (v2) → Dashboard Lambda, public HTTPS endpoint |
 | **S3 Bucket** | `crypto-collector-prod-data-720428162886` (eu-north-1) |
-| **Logs** | CloudWatch `/aws/lambda/crypto-collector-prod-signal-engine` |
-| **Alarm** | CloudWatch alarm on Lambda errors |
+| **Logs** | CloudWatch log groups for each Lambda (7-day retention) |
+| **Alarms** | CloudWatch alarms on Lambda errors → SNS alerts |
 
 ### S3 Data Structure
 
@@ -364,9 +370,13 @@ crypto-signal-engine/
 │   │   ├── binance_fetcher.py # Binance Futures REST API
 │   │   ├── candle_store.py    # S3 rolling buffer management
 │   │   └── config.py          # Signal weights, thresholds
+│   ├── dashboard_lambda/      # Dashboard Lambda (Flask via Mangum)
+│   │   ├── __init__.py
+│   │   └── handler.py         # WSGI→ASGI adapter + Mangum entry point
 │   ├── terraform/             # Infrastructure as code
-│   │   ├── main.tf            # Deribit collector Lambda
-│   │   └── signal_lambda.tf   # Signal engine Lambda + EventBridge
+│   │   ├── main.tf            # Deribit collector Lambda + shared infra
+│   │   ├── signal_lambda.tf   # Signal engine Lambda + EventBridge
+│   │   └── dashboard_lambda.tf # Dashboard Lambda + API Gateway
 │   ├── collector.py           # Deribit data collector
 │   ├── s3_storage.py          # S3 read/write utilities
 │   ├── lambda_handler.py      # Deribit Lambda entry point
